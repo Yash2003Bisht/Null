@@ -1,0 +1,45 @@
+# Ignore node_modules directory
+# This directory contains all the npm packages and dependencies.
+node_modules/
+
+# Ignore build output directory
+# This is where compiled files are generated.
+out/
+
+# Ignore VSCode specific settings
+# This directory contains workspace settings specific to VSCode.
+.vscode/
+
+# Ignore log files
+# Log files can contain sensitive information and are not needed in the repo.
+*.log
+
+# Ignore temporary files
+# Temporary files created during development or testing.
+.tmp/
+
+# Ignore environment variable files
+# These files can contain sensitive information like API keys.
+.env
+
+# Ignore compiled TypeScript files
+# If using TypeScript, these files are generated from the source code.
+*.js
+*.js.map
+
+# Ignore package lock file
+# This file locks the versions of dependencies. You may choose to include it.
+package-lock.json
+
+# Ignore OS specific files
+# These files are created by the operating system and are not needed.
+.DS_Store
+Thumbs.db
+
+# Ignore test coverage reports
+# If you are generating coverage reports, you may want to exclude them.
+coverage/
+
+# Ignore other IDE specific files
+# These files are specific to other IDEs and are not relevant to the project.
+.idea/
