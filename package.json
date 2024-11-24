@@ -23,18 +23,28 @@
     ],
     "commands": [
       {
-        "command": "openaiCodeCompletion.setApiKey",
-        "title": "Null Code: Set OpenAI API Key"
+        "command": "codeCompletion.setApiKey",
+        "title": "Null Code: Set API Key and Provider"
       }
     ],
     "configuration": {
       "type": "object",
-      "title": "Null Code: OpenAI Code Completion",
+      "title": "Null Code: Set API Key and Provider",
       "properties": {
-        "openaiCodeCompletion.apiKey": {
+        "codeCompletion.apiKey": {
           "type": "string",
           "default": "",
-          "description": "Your OpenAI API key for code completion.",
+          "description": "API key.",
+          "scope": "window"
+        },
+        "codeCompletion.provider": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "openai",
+            "anthropic"
+          ],
+          "description": "The provider to use for code completion.",
           "scope": "window"
         }
       }
@@ -66,6 +76,8 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "@langchain/anthropic": "^0.3.8",
+    "@langchain/core": "^0.3.18",
     "@langchain/openai": "^0.3.13",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
