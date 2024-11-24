@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 import * as vscode from 'vscode';
 import { fetchCompletion, checkApiKeyValidity } from './utils';
 import { ContextAwareness, UserContext } from './contextAwareness';
+import CompletionFormatter from './completionFormatter';
 
 dotenv.config();
 
@@ -124,11 +125,22 @@ export function activate(context: vscode.ExtensionContext) {
 
 				const completionText = await fetchCompletion(prompt);
 
-				if (!completionText) {
+				if (!completionText || token.isCancellationRequested) {
 					return { items: [] };
 				}
 
-				const item = new vscode.InlineCompletionItem(completionText);
+				// Format the completion using formatter
+				const formattedCompletion = CompletionFormatter.formatCompletion(
+					document,
+					position,
+					completionText
+				);
+
+				const item = new vscode.InlineCompletionItem(
+					formattedCompletion.text,
+					formattedCompletion.range
+				);
+
 				item.range = new vscode.Range(position, position);
 
 				return { items: [item] };
