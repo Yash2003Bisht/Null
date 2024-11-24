@@ -82,13 +82,13 @@ async function fetchCompletion(prompt: string): Promise<string> {
 	}
 }
 
-async function checkApiKeyValidity(apiKey: string, provider: string): Promise<boolean> {
+async function checkApiKeyValidity(apiKey: string, provider: string, modelName: string): Promise<boolean> {
 	try {
 		if (provider === 'openai') {
 			// Check validity by creating an instance of ChatOpenAI
 			const model = new ChatOpenAI({
 				openAIApiKey: apiKey,
-				modelName: 'gpt-4o-mini',
+				modelName: modelName,
 			});
 			await model.invoke([{ role: 'user', content: 'Test prompt for validation.' }]);
 		} else if (provider === 'anthropic') {
@@ -190,7 +190,7 @@ export function activate(context: vscode.ExtensionContext) {
 	);
 
 	// Command to setup Null code suggestions
-	const setApiKeyCommand = vscode.commands.registerCommand('codeCompletion.setApiKey', async () => {
+	const setupCommand = vscode.commands.registerCommand('codeCompletion.setup', async () => {
 		const apiKey = await vscode.window.showInputBox({
 			prompt: 'Enter your API Key',
 			placeHolder: 'Your API Key...',
@@ -198,44 +198,47 @@ export function activate(context: vscode.ExtensionContext) {
 			password: true,
 		});
 
+		if (!apiKey) {
+			vscode.window.showErrorMessage('API Key is required!');
+			return;
+		}
+
 		const provider = await vscode.window.showQuickPick(['openai', 'anthropic'], {
 			placeHolder: 'Select the provider (OpenAI or Anthropic)',
 			ignoreFocusOut: true,
 		});
 
-		if (apiKey && provider) {
-			const isValidApiKey = await checkApiKeyValidity(apiKey, provider);
-
-			if (isValidApiKey) {
-				await vscode.workspace.getConfiguration('codeCompletion').update('apiKey', apiKey, vscode.ConfigurationTarget.Global);
-				await vscode.workspace.getConfiguration('codeCompletion').update('provider', provider, vscode.ConfigurationTarget.Global);
-				vscode.window.showInformationMessage(`${provider} API Key saved successfully.`);
-			} else {
-				vscode.window.showErrorMessage('Invalid API Key. Please check and try again.');
-			}
-		} else {
-			vscode.window.showErrorMessage('API Key and provider are required!');
-		}
-	});
-
-	// Command to setup model name
-	const setModelCommand = vscode.commands.registerCommand("codeCompletion.setModel", async () => {
-		const provider = vscode.workspace.getConfiguration("codeCompletion").get<"openai" | "anthropic">("provider");
 		if (!provider) {
-			vscode.window.showErrorMessage("Please select a provider first.");
+			vscode.window.showErrorMessage('Provider is required!');
 			return;
 		}
 
+		// @ts-ignore
 		const model = await selectModel(provider);
-		if (model) {
-			await vscode.workspace.getConfiguration("codeCompletion").update("model", model, vscode.ConfigurationTarget.Global);
-			vscode.window.showInformationMessage(`Model '${model}' selected for ${provider}.`);
+
+		if (!model) {
+			vscode.window.showErrorMessage('Model selection is required!');
+			return;
 		}
+
+		// Validate API Key
+		const isValidApiKey = await checkApiKeyValidity(apiKey, provider, model);
+		if (!isValidApiKey) {
+			vscode.window.showErrorMessage('Invalid API Key or Model Name. Please check and try again.');
+			return;
+		}
+
+		// Save Configurations
+		await vscode.workspace.getConfiguration('codeCompletion').update('apiKey', apiKey, vscode.ConfigurationTarget.Global);
+		await vscode.workspace.getConfiguration('codeCompletion').update('provider', provider, vscode.ConfigurationTarget.Global);
+		await vscode.workspace.getConfiguration('codeCompletion').update('model', model, vscode.ConfigurationTarget.Global);
+
+		vscode.window.showInformationMessage(`Setup complete with Provider: ${provider}, Model: ${model}.`);
 	});
 
-	context.subscriptions.push(setApiKeyCommand);
+	context.subscriptions.push(setupCommand);
 	context.subscriptions.push(completionProvider);
-	context.subscriptions.push(setModelCommand);
+
 }
 
 export function deactivate() { }

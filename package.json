@@ -23,7 +23,7 @@
     ],
     "commands": [
       {
-        "command": "codeCompletion.setApiKey",
+        "command": "codeCompletion.setup",
         "title": "Null Code: Set API Key and Provider"
       }
     ],
