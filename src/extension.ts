@@ -13,15 +13,28 @@ const completionSchema = z.object({
 	language: z.string(),
 });
 
+// Predefine models
+const predefinedModels: { openai: string[]; anthropic: string[] } = {
+	openai: ["gpt-4o", "gpt-4o-mini", "gpt-1o-preview", "gpt-1o-mini"],
+	anthropic: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"]
+};
+
 const outputParser = StructuredOutputParser.fromZodSchema(completionSchema);
 
 async function fetchCompletion(prompt: string): Promise<string> {
 	// Get model configuration from settings
-	const apiKey = vscode.workspace.getConfiguration('codeCompletion').get<string>('apiKey') || process.env.API_KEY;
-	const provider = vscode.workspace.getConfiguration('codeCompletion').get<string>('provider') || process.env.PROVIDER;
+	const config = vscode.workspace.getConfiguration("codeCompletion");
+	const apiKey = config.get<string>("apiKey") || process.env.API_KEY;
+	const provider = config.get<string>("provider") || process.env.PROVIDER;
+	const modelName = config.get<string>("model") || process.env.MODEL_NAME;
 
-	if (!apiKey || !provider) {
-		vscode.window.showErrorMessage("API Key or Provider is missing. Please configure settings.");
+	if (!apiKey) {
+		vscode.window.showErrorMessage("API Key is missing.");
+		return '';
+	}
+
+	if (!provider || !modelName) {
+		vscode.window.showErrorMessage("Provider or Model is not selected.");
 		return '';
 	}
 
@@ -33,14 +46,14 @@ async function fetchCompletion(prompt: string): Promise<string> {
 			model = new ChatOpenAI({
 				temperature: 0.5,
 				openAIApiKey: apiKey,
-				modelName: 'gpt-4o-mini',
+				modelName: modelName,
 			});
 
 		} else if (provider === 'anthropic') {
 			const model = new ChatAnthropic({
 				temperature: 0.5,
 				anthropicApiKey: apiKey,
-				modelName: 'claude-3-haiku-20240307',
+				modelName: modelName,
 			});
 
 		} else {
@@ -95,7 +108,49 @@ async function checkApiKeyValidity(apiKey: string, provider: string): Promise<bo
 	}
 }
 
+async function selectModel(provider: "openai" | "anthropic"): Promise<string | undefined> {
+	const config = vscode.workspace.getConfiguration("codeCompletion");
+	const customModels = config.get<{ [key: string]: string[] }>("customModels") || {};
+
+	const allModels = [
+		...(predefinedModels[provider] || []), // Safe to index with `provider`
+		...(customModels[provider] || []),
+		"Add a Model..."
+	];
+
+	const selectedModel = await vscode.window.showQuickPick(allModels, {
+		title: `Select a model for ${provider}`,
+		placeHolder: "Choose a model or add a new one"
+	});
+
+	// Handle "Add a Model" option...
+	if (selectedModel === "Add a Model...") {
+		const newModel = await vscode.window.showInputBox({
+			title: "Enter model name",
+			prompt: "Provide the name of the new model",
+			placeHolder: "e.g., my-custom-model",
+			ignoreFocusOut: true
+		});
+
+		if (newModel) {
+			const updatedCustomModels = { ...customModels };
+			if (!updatedCustomModels[provider]) {
+				updatedCustomModels[provider] = [];
+			}
+			updatedCustomModels[provider].push(newModel);
+			await config.update("customModels", updatedCustomModels, vscode.ConfigurationTarget.Global);
+
+			vscode.window.showInformationMessage(`Model '${newModel}' added for ${provider}.`);
+			return newModel;
+		}
+	}
+
+	return selectedModel;
+}
+
 export function activate(context: vscode.ExtensionContext) {
+
+	// Completion provider command
 	const completionProvider = vscode.languages.registerInlineCompletionItemProvider(
 		{ scheme: 'file' },
 		{
@@ -134,7 +189,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	);
 
-	// Command to set the API key and provider
+	// Command to setup Null code suggestions
 	const setApiKeyCommand = vscode.commands.registerCommand('codeCompletion.setApiKey', async () => {
 		const apiKey = await vscode.window.showInputBox({
 			prompt: 'Enter your API Key',
@@ -163,8 +218,24 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// Command to setup model name
+	const setModelCommand = vscode.commands.registerCommand("codeCompletion.setModel", async () => {
+		const provider = vscode.workspace.getConfiguration("codeCompletion").get<"openai" | "anthropic">("provider");
+		if (!provider) {
+			vscode.window.showErrorMessage("Please select a provider first.");
+			return;
+		}
+
+		const model = await selectModel(provider);
+		if (model) {
+			await vscode.workspace.getConfiguration("codeCompletion").update("model", model, vscode.ConfigurationTarget.Global);
+			vscode.window.showInformationMessage(`Model '${model}' selected for ${provider}.`);
+		}
+	});
+
 	context.subscriptions.push(setApiKeyCommand);
 	context.subscriptions.push(completionProvider);
+	context.subscriptions.push(setModelCommand);
 }
 
 export function deactivate() { }

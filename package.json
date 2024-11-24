@@ -46,6 +46,19 @@
           ],
           "description": "The provider to use for code completion.",
           "scope": "window"
+        },
+        "codeCompletion.model": {
+          "type": "string",
+          "description": "Select or add a model",
+          "default": ""
+        },
+        "codeCompletion.customModels": {
+          "type": "object",
+          "description": "Custom model list for each provider",
+          "default": {
+            "openai": [],
+            "anthropic": []
+          }
         }
       }
     }
