@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import * as vscode from 'vscode';
 import { fetchCompletion, checkApiKeyValidity } from './utils';
+import { ContextAwareness, UserContext } from './contextAwareness';
 
 dotenv.config();
 
@@ -51,6 +52,35 @@ async function selectModel(provider: "openai" | "anthropic"): Promise<string | u
 }
 
 export function activate(context: vscode.ExtensionContext) {
+	// Initialize the ContextAwareness class
+	const contextAwareness = new ContextAwareness();
+
+	// Listen for changes in the active text editor
+	vscode.window.onDidChangeActiveTextEditor(() => {
+		// Update the sliding window whenever the active editor changes
+		contextAwareness.getUserContext();
+	});
+
+	// Listen for text document changes (e.g., when the user modifies code)
+	vscode.workspace.onDidChangeTextDocument(() => {
+		// Update the sliding window context
+		contextAwareness.getUserContext();
+	});
+
+	// Hook into when a completion item is accepted (if supported by VS Code API)
+	vscode.commands.registerCommand('editor.action.acceptCompletionItem', (args: any) => {
+		if (args?.item?.label) {
+			// Track the accepted suggestion
+			contextAwareness.trackAcceptedSuggestion(args.item.label);
+		}
+	});
+
+	// Register a sample command to fetch and log the user context
+	const disposable = vscode.commands.registerCommand('extension.showUserContext', () => {
+		const userContext: UserContext = contextAwareness.getUserContext();
+		vscode.window.showInformationMessage('User context logged in console.');
+		console.log('Current User Context:', userContext);
+	});
 
 	// Completion provider command
 	const completionProvider = vscode.languages.registerInlineCompletionItemProvider(
@@ -63,18 +93,33 @@ export function activate(context: vscode.ExtensionContext) {
 					return { items: [] };
 				}
 
+				// Retrieve user context
+				const userContext = contextAwareness.getUserContext();
+
+				// Extract relevant context details
+				const recentCode = userContext.recentLines.join('\n');
+				const acceptedSuggestions = userContext.acceptedSuggestions.join(', ');
+				const surrondingCode = userContext.surroundingContext;
+
 				// Create the prompt
 				const prompt = `
-				You are a helpful coding assistant. Your task is to complete code snippets.
-				The user has typed the following in ${document.languageId}:
-	
-				${userInput}
-	
-				Only complete the code from where the user's input ends. Do not repeat or duplicate the user's input.
-				Provide the output as a string containing only the remaining part of the code.
-	
-				Completion starts after the input. Here's the input to complete:
-				${userInput}
+					You are a helpful coding assistant. Your task is to complete code snippets.
+					The user is currently coding in ${document.languageId}.
+					
+					Here is the recent code context (last ${userContext.recentLines.length} lines):
+					${recentCode}
+
+					The user has previously accepted the following suggestions:
+					${acceptedSuggestions || 'None'}
+
+					Code in the surronding:
+					${surrondingCode}
+
+					Only complete the code from where the user's input ends. Do not repeat or duplicate the user's input.
+					Provide the output as a string containing only the remaining part of the code.
+
+					Completion starts after the input. Here's the input to complete:
+					${userInput}
 				`;
 
 				const completionText = await fetchCompletion(prompt);
@@ -140,6 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(setupCommand);
 	context.subscriptions.push(completionProvider);
+	context.subscriptions.push(disposable);
 
 }
 
