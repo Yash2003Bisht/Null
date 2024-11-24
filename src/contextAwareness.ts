@@ -63,10 +63,6 @@ export class ContextAwareness {
         this.updateSlidingWindow();
         const surroundingContext = this.getSurroundingContext();
 
-        console.log(this.slidingWindow);
-        console.log(this.acceptedSuggestions);
-        console.log(surroundingContext);
-
         return {
             recentLines: this.slidingWindow,
             acceptedSuggestions: this.acceptedSuggestions,
