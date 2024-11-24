@@ -136,7 +136,6 @@ export function activate(context: vscode.ExtensionContext) {
 
 						try {
 							const completionText = await fetchCompletion(prompt);
-							console.log(completionText);
 
 							if (!completionText || token.isCancellationRequested) {
 								resolve({ items: [] });

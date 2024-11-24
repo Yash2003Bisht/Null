@@ -12,6 +12,12 @@ const completionSchema = z.object({
 
 export async function fetchCompletion(prompt: string): Promise<string> {
     const outputParser = StructuredOutputParser.fromZodSchema(completionSchema);
+    // const inputTokens = prompt.length / 4;
+
+    // console.log("Input Tokens");
+    // console.log(inputTokens);
+
+    console.log(prompt)
 
     // Get model configuration from settings
     const config = vscode.workspace.getConfiguration("codeCompletion");
