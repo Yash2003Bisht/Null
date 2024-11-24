@@ -74,25 +74,28 @@ export async function fetchCompletion(prompt: string): Promise<string> {
 }
 
 export async function checkApiKeyValidity(apiKey: string, provider: string, modelName: string): Promise<boolean> {
+    let model: any;
     try {
         if (provider === 'openai') {
             // Check validity by creating an instance of ChatOpenAI
-            const model = new ChatOpenAI({
+            model = new ChatOpenAI({
                 openAIApiKey: apiKey,
                 modelName: modelName,
             });
-            await model.invoke([{ role: 'user', content: 'Test prompt for validation.' }]);
         } else if (provider === 'anthropic') {
             // Check validity by creating an instance of ChatAnthropic
-            const model = new ChatAnthropic({
+            model = new ChatAnthropic({
                 anthropicApiKey: apiKey,
                 modelName: 'claude-3-haiku-20240307',
             });
-            await model.invoke([{ role: 'user', content: 'Test prompt for validation.' }]);
         } else {
             throw new Error("Unsupported provider.");
         }
+
+        await model.invoke([{ role: 'user', content: 'Test prompt for validation.' }]);
+
         return true;
+
     } catch (error) {
         console.error('Error validating API key:', error);
         return false;
