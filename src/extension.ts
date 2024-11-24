@@ -12,6 +12,8 @@ const predefinedModels: { openai: string[]; anthropic: string[] } = {
 	anthropic: ["claude-3-5-sonnet-latest", "claude-3-5-haiku-latest", "claude-3-opus-latest"]
 };
 
+let typingTimeout: NodeJS.Timeout | null = null;
+
 async function selectModel(provider: "openai" | "anthropic"): Promise<string | undefined> {
 	const config = vscode.workspace.getConfiguration("codeCompletion");
 	const customModels = config.get<{ [key: string]: string[] }>("customModels") || {};
@@ -88,22 +90,31 @@ export function activate(context: vscode.ExtensionContext) {
 		{ scheme: 'file' },
 		{
 			async provideInlineCompletionItems(document, position, context, token) {
-				const userInput = document.lineAt(position).text.substr(0, position.character);
-
-				if (!userInput.trim()) {
-					return { items: [] };
+				// Clear the previous timeout
+				if (typingTimeout) {
+					clearTimeout(typingTimeout);
 				}
 
-				// Retrieve user context
-				const userContext = contextAwareness.getUserContext();
+				// Return a Promise that resolves only after 300ms of inactivity
+				return new Promise((resolve) => {
+					typingTimeout = setTimeout(async () => {
+						const userInput = document.lineAt(position).text.substr(0, position.character);
 
-				// Extract relevant context details
-				const recentCode = userContext.recentLines.join('\n');
-				const acceptedSuggestions = userContext.acceptedSuggestions.join(', ');
-				const surrondingCode = userContext.surroundingContext;
+						if (!userInput.trim()) {
+							resolve({ items: [] });
+							return;
+						}
 
-				// Create the prompt
-				const prompt = `
+						// Retrieve user context
+						const userContext = contextAwareness.getUserContext();
+
+						// Extract relevant context details
+						const recentCode = userContext.recentLines.join('\n');
+						const acceptedSuggestions = userContext.acceptedSuggestions.join(', ');
+						const surrondingCode = userContext.surroundingContext;
+
+						// Create the prompt
+						const prompt = `
 					You are a helpful coding assistant. Your task is to complete code snippets.
 					The user is currently coding in ${document.languageId}.
 					
@@ -123,27 +134,35 @@ export function activate(context: vscode.ExtensionContext) {
 					${userInput}
 				`;
 
-				const completionText = await fetchCompletion(prompt);
+						try {
+							const completionText = await fetchCompletion(prompt);
+							console.log(completionText);
 
-				if (!completionText || token.isCancellationRequested) {
-					return { items: [] };
-				}
+							if (!completionText || token.isCancellationRequested) {
+								resolve({ items: [] });
+								return;
+							}
 
-				// Format the completion using formatter
-				const formattedCompletion = CompletionFormatter.formatCompletion(
-					document,
-					position,
-					completionText
-				);
+							// Format the completion using formatter
+							const formattedCompletion = CompletionFormatter.formatCompletion(
+								document,
+								position,
+								completionText
+							);
 
-				const item = new vscode.InlineCompletionItem(
-					formattedCompletion.text,
-					formattedCompletion.range
-				);
+							const item = new vscode.InlineCompletionItem(
+								formattedCompletion.text,
+								formattedCompletion.range
+							);
+							item.range = new vscode.Range(position, position);
 
-				item.range = new vscode.Range(position, position);
-
-				return { items: [item] };
+							resolve({ items: [item] });
+						} catch (error) {
+							console.error("Error in fetching completion:", error);
+							resolve({ items: [] });
+						}
+					}, 500);
+				});
 			},
 		}
 	);
